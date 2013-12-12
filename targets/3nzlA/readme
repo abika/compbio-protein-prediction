@@ -1,0 +1,1 @@
+<your_rosetta_folder>/rosetta_source/bin/compbio_app.linuxgccrelease @flags -database <your_rosetta_folder>/rosetta_database/

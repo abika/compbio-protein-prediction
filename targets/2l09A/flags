@@ -1,0 +1,7 @@
+-in:file:fasta inputs/2l09A.fasta
+-in:file:frag3 inputs/aa2l09A03_05.200_v1_3
+-in:file:frag9 inputs/aa2l09A09_05.200_v1_3
+-in:file:native inputs/2l09A.pdb
+-out:nstruct 100
+-out:pdb
+-mute core.io.database
