@@ -32,7 +32,6 @@ def split_path(path):
         folders.append(folder)
 
     folders.reverse()
-    print(folders)
     return folders
 
 def move_file(src_str, dest_str):

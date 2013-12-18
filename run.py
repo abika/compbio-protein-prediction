@@ -18,6 +18,8 @@ import subprocess
 
 import _myutils
 
+NUM_MODELS = 20
+
 def _arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("target_pdb_file", type=str, help="Target pdb file")
@@ -62,15 +64,16 @@ def _tmalign(model_pdb_file, pdb_dir):
         print("%d/%d" % (len(scores), len(files)))
     
     scores.sort(key=lambda t: t[1], reverse=True)
-    
     return scores
     
-    
+def _blast(target_fasta_file, ):
+
 def main(argv=sys.argv):
     logging.getLogger().setLevel(logging.INFO)
     
     args = _arguments()
-    target_base_dir = os.path.join(*_myutils.split_path(os.path.abspath(args.target_pdb_file))[:-2])
+    target_pdb_path = os.path.abspath(args.target_pdb_file)
+    target_base_dir = os.path.join(*_myutils.split_path(target_pdb_path)[:-2])
     
     # step 1: run compbio_app
     # TODO: currently done manually
@@ -78,17 +81,22 @@ def main(argv=sys.argv):
     # step 2: read scorefile 
     field_dict_list = _read_scorefile(target_base_dir)
     
-    # step 3: run tmalign
-    model_pdb_file = os.path.join(target_base_dir, 'models', field_dict_list[0]["description"] + '.pdb')
+    # step 3: get structure scores with tmalign
+    decoy_dict = field_dict_list[0]
+    model_pdb_file = os.path.join(target_base_dir, 'models', decoy_dict["description"] + '.pdb')
     scores = _tmalign(model_pdb_file, args.pdb_dir)
-    
-    print('\n'.join(str(t) for t in scores[:10]))
 
     output_file_str = os.path.splitext(model_pdb_file)[0]+'_tmalign_scores.txt'
     _myutils.write_file(output_file_str , '\n'.join(' '.join(t) for t in scores))    
+
+    scores = scores[:NUM_MODELS]
     
     # step 4: get sequence scores
+    target_fasta_file = os.path.splitext(target_pdb_path)[0]+' .fasta'
+    scores = [_blast(target_fasta_file, ) for ]
     # TODO
+    
+    print('\n'.join(str(t) for t in scores))    
     
     print("DONE!")
 
