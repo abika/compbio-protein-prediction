@@ -88,7 +88,8 @@ do
     then
         size=$(echo $sequence | wc -c)
         size=$((size-1))
-        echo ">${name%.pdb} | chain $chain | $size aa"
+        #echo ">${name%.pdb} | chain $chain | $size aa"
+        echo ">${name%.pdb}|PDBID|CHAIN|SEQUENCE"
         #echo $sequence | split_80
         echo $sequence
     fi
