@@ -9,7 +9,6 @@ Created on Fri Dec 13 16:21:09 2013
 Dependencies:
 - TMalign needs to be in PATH
 - blastp needs to be in PATH
-- biopython must be installed
 
 """
 
@@ -19,7 +18,6 @@ import argparse
 import os
 import subprocess
 import itertools
-import Bio.PDB
 
 import _myutils
 
@@ -28,6 +26,7 @@ NUM_CONSTR_MODELS = 3 # number of models used for constraint extraction per iter
 WEIGHT_STRUC = 1
 WEIGHT_SEQ = 0.01
 D = 1 # lower bound distance in angstrom for constraint extraction
+SD = '0.2' # scaling value for constraint distance
 
 def _arguments():
     parser = argparse.ArgumentParser()
@@ -62,8 +61,7 @@ def _run_tmalign(target_pdb, template_pdb):
     # TODO: not sure if the correct score is extracted, '-a' maybe wrong too
     args = ["TMalign "+target_pdb+" "+template_pdb+" -a | grep ^TM-score "
             """| tail -n 1 | sed -n 's|^.*TM-score= \([0-9.]\+\).*|\\1|p'"""]
-    #score = subprocess.check_output(args, shell=True).rstrip().decode("utf-8")
-    score = 42
+    score = subprocess.check_output(args, shell=True).rstrip().decode("utf-8")
     return os.path.basename(template_pdb), float(score)
 
 def _tmalign(model_pdb_file, pdb_dir):
@@ -98,18 +96,6 @@ def _run_tmalign_constr(target_pdb_file, template_pdb_file, d):
     args = ["TMalign "+target_pdb_file+" "+template_pdb_file+" -d "+str(d)+" | tail -n 4"]
     outp_lines = subprocess.check_output(args, shell=True).rstrip().decode("utf-8").splitlines()
     return list(zip(_residue_indices(outp_lines[0], outp_lines[1]), _residue_indices(outp_lines[2], outp_lines[1])))
-
-def _tmalign_constr(target_pdb_file, template_pdb_file):
-    res_pairs = _run_tmalign_constr(target_pdb_file, template_pdb_file, D)
-    print(len(res_pairs), res_pairs)
-    parser = Bio.PDB.PDBParser(PERMISSIVE=1)
-    structure = parser.get_structure('id', target_pdb_file)
-    print(structure.header)
-    print(list(structure.get_residues()))
-    # TODO ... 
-
-    # AtomPair: Atom1_Name Atom1_ResNum Atom2_Name Atom2_ResNum Func_Type Func_Def
-    # AtomPair SG 5 V1 32 HARMONIC 0.0 0.2
 
 def main(argv=sys.argv):
     logging.getLogger().setLevel(logging.INFO)
@@ -153,10 +139,27 @@ def main(argv=sys.argv):
     print('\n'.join(str(t) for t in scores))    
 
     # step 5: get constraints from selected models    
-    constr_models = scores[:1] # TODO
+    constr_models = scores[:1] # TODO: how many models?
+    res_pairs = []
     for model_file, strs, seqs, fs in constr_models:
         model_pdb_path = os.path.join(pdb_dir, model_file)
-        _tmalign_constr(target_pdb_path, model_pdb_path)
+        res_pairs += _run_tmalign_constr(target_pdb_path, model_pdb_path, D)
+    
+    # remove inconsistent pairs
+    res_pairs = _myutils.remove_dups(res_pairs, comp_item_index=0)
+    res_pairs = _myutils.remove_dups(res_pairs, comp_item_index=1)
+    
+    # save constraint file
+    
+    # biopython not required, the residue numbering should be the same for tmalign and rosetta
+    #parser = Bio.PDB.PDBParser(PERMISSIVE=1)
+    #structure = parser.get_structure('id', target_pdb_file)
+
+    # AtomPair: Atom1_Name Atom1_ResNum Atom2_Name Atom2_ResNum Func_Type Func_Def
+    # AtomPair SG 5 V1 32 HARMONIC 0.0 0.2
+    ros_constr = ['AtomPair CA '+str(n1)+' CA '+str(n2)+' HARMONIC 0.0 '+SD for n1, n2 in res_pairs]
+    constr_file_path = os.path.join(target_base_dir,'inputs', 'ros_constraints.txt')
+    _myutils.write_file(constr_file_path, '\n'.join(ros_constr) + '\n')
     
     print("DONE!")
 

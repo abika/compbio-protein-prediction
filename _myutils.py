@@ -168,7 +168,7 @@ def datetime_from_zipinfo(z_info):
     return datetime.datetime(*(z_info.date_time)).strftime('%Y-%m-%d %H:%M:%S')
 
 def md5sum(str_):
-    """Calculate the md5sum for a givin URL"""
+    """Calculate the md5sum in hex of an string"""
     sanitized_str = ''.join([c for c in str_ if ord(c) < 128])             
     md5sum_str = hashlib.md5(sanitized_str).hexdigest()
     return md5sum_str
@@ -193,6 +193,19 @@ def load_object(path_str):
         raise NameError("Error loading object '%s' doesn't define any object named '%s'" % (obj_str, mod_str))
     return obj
 
+def remove_dups(some_list, comp_item_index=-1):
+    """Remove duplicated items in list, preserves order.
+       If compItem is given some_list is treated as list of sequences, the duplicates
+       will be found by comparing the items at compItem position in the sequences.
+    """
+    seen = set()
+    seen_add = seen.add
+    if comp_item_index > 0:
+        filt_list = [x for x in some_list if x not in seen and not seen_add(x)]
+    else:
+        filt_list = [t for t in some_list if t[comp_item_index] not in seen and not seen_add(t[comp_item_index])]
+    print('removed '+str(len(some_list)-len(filt_list))+' duplicates')
+    return filt_list
 
 # ############
 # OLD STUFF...
@@ -233,20 +246,6 @@ def chunkIt(seq, num):
         out.append(seq[int(last):int(last + avg)])
         last += avg
     return out
-
-def removeDups(some_list, compItem=-1):
-    """Remove duplicated items in list, preserves order.
-       If compItem is given some_list is treated as list of sequences, the duplicates
-       will be found by comparing the items at compItem position in the sequences.
-    """
-    seen = set()
-    seen_add = seen.add
-    if compItem == -1:
-        filt_list = [x for x in some_list if x not in seen and not seen_add(x)]
-    else:
-        filt_list = [t for t in some_list if t[compItem] not in seen and not seen_add(t[compItem])]
-    print('removed '+str(len(some_list)-len(filt_list))+' duplicates')
-    return filt_list
 
 def rand_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for x in range(size))
