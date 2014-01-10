@@ -4,7 +4,7 @@
 """
 Created on Fri Dec 13 16:21:09 2013
 
-@author: Alexander Bikadorov
+@author: Alexander Bikadorov, Marcelo Millani
 
 Dependencies:
 - TMalign needs to be in PATH
