@@ -9,6 +9,8 @@ Created on Fri Dec 13 16:21:09 2013
 Dependencies:
 - TMalign needs to be in PATH
 - blastp needs to be in PATH
+- grep needs to be in PATH
+- head needs to be in PATH
 
 """
 
@@ -27,6 +29,8 @@ WEIGHT_STRUC = 1
 WEIGHT_SEQ = 0.01
 D = 1 # lower bound distance in angstrom for constraint extraction
 SD = '0.2' # scaling value for constraint distance
+TMALIGN_SEPARATOR = "# SEPARATOR #"
+PROCESSES = 8
 
 def _arguments():
     parser = argparse.ArgumentParser()
@@ -57,12 +61,46 @@ def _read_scorefile(target_base_dir):
         
     return field_dict_list
 
+def _run_para_tmalign(target_pdb,templates_pdbs):
+    # parser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
+    args = ["paratmalign %d %s %s %s"%(PROCESSES,target_pdb, TMALIGN_SEPARATOR ," ".join(templates_pdbs))]
+    all = subprocess.check_output(args, shell=True).rstrip().decode("utf-8")
+		executions = all.split(TMALIGN_SEPARATOR)
+		name = os.path.basename(template_pdb)
+		scores = []
+		# gets the score of each execution
+		for e in executions:
+			score = subprocess.check_output("echo $s | $s"$(e,parser), shell=True).rstrip().decode("utf-8")
+			scores.append((name,float(score)))
+			
+    return scores
+
+
 def _run_tmalign(target_pdb, template_pdb):
     # TODO: not sure if the correct score is extracted, '-a' maybe wrong too
-    args = ["TMalign "+target_pdb+" "+template_pdb+" -a | grep ^TM-score "
-            """| tail -n 1 | sed -n 's|^.*TM-score= \([0-9.]\+\).*|\\1|p'"""]
+    # args = ["TMalign "+target_pdb+" "+template_pdb+" -a | grep ^TM-score "
+    #        """| tail -n 1 | sed -n 's|^.*TM-score= \([0-9.]\+\).*|\\1|p'"""]
+    # TMalign says:
+    # There are two TM-scores reported. You should use the one normalized by
+    # the length of the protein you are interested in.
+    # I think we should stick to that
+    parser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
+    args = ["TMalign %s %s | "%(target_pdb, template_pdb) + parser]
     score = subprocess.check_output(args, shell=True).rstrip().decode("utf-8")
     return os.path.basename(template_pdb), float(score)
+
+def _para_tmalign(model_pdb_file, pdb_dir):
+    print('running paraTMAlign for '+model_pdb_file+'...')    
+    scores = []
+    CHUNK_SIZE = 100
+    files = _myutils.files_in_dir(pdb_dir, '*.pdb')
+    # run tmalign for each template in database
+    for chunk in _myutils.group_it(files, CHUNK_SIZE):
+        scores += _run_para_tmalign(model_pdb_file, chunk)
+        print("%d/%d" % (len(scores), len(files)))
+    
+    scores.sort(key=lambda t: t[1], reverse=True) # higher score better
+    return scores
 
 def _tmalign(model_pdb_file, pdb_dir):
     print('running TMAlign for '+model_pdb_file+'...')    
