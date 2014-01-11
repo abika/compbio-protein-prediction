@@ -62,16 +62,25 @@ def _read_scorefile(target_base_dir):
     return field_dict_list
 
 def _run_para_tmalign(target_pdb,templates_pdbs):
-    # parser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
-    args = ["paratmalign %d %s %s %s"%(PROCESSES,target_pdb, TMALIGN_SEPARATOR ," ".join(templates_pdbs))]
+    scoreParser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
+    nameParser = r"grep '^Name of Chain_2:'"
+    args = ["paratmalign %d '%s' '%s' %s"%(PROCESSES,target_pdb, TMALIGN_SEPARATOR ,"'"+"' '".join(templates_pdbs) + "'")]
+
+    # print("Args: "+" ".join(args))
+
     all = subprocess.check_output(args, shell=True).rstrip().decode("utf-8")
     executions = all.split(TMALIGN_SEPARATOR)
-    name = os.path.basename(template_pdb)
+
     scores = []
     # gets the score of each execution
-    for e in executions:
-      score = subprocess.check_output("echo $s | $s"$(e,parser), shell=True).rstrip().decode("utf-8")
-      scores.append((name,float(score)))
+    for i in range(0,len(executions),2):
+        e = executions[i]
+        name = executions[i+1]
+        try:
+            score = subprocess.check_output("echo $s | $s"%(e,scoreParser), shell=True).rstrip().decode("utf-8")
+            scores.append((name,float(score)))
+        except:
+            scores.append((name,0.0))
       
     return scores
 
@@ -87,26 +96,31 @@ def _run_tmalign(target_pdb, template_pdb):
     parser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
     args = ["TMalign %s %s | "%(target_pdb, template_pdb) + parser]
     score = subprocess.check_output(args, shell=True).rstrip().decode("utf-8")
-    return os.path.basename(template_pdb), float(score)
+    try:
+        return os.path.basename(template_pdb), float(score)
+    except:
+        print("".join(args))
+        return os.path.basename(template_pdb), 0.0
 
 def _para_tmalign(model_pdb_file, pdb_dir):
     print('running paraTMAlign for '+model_pdb_file+'...')    
     scores = []
     CHUNK_SIZE = 100
-    files = _myutils.files_in_dir(pdb_dir, '*.pdb')
+    files = _myutils.files_in_dir(pdb_dir, '*.pdb') + _myutils.files_in_dir(pdb_dir, '*.ent')
     # run tmalign for each template in database
     for chunk in _myutils.group_it(files, CHUNK_SIZE):
         scores += _run_para_tmalign(model_pdb_file, chunk)
         print("%d/%d" % (len(scores), len(files)))
     
     scores.sort(key=lambda t: t[1], reverse=True) # higher score better
+    print("Scores.len = %d"%(len(scores)))
     return scores
 
 def _tmalign(model_pdb_file, pdb_dir):
     print('running TMAlign for '+model_pdb_file+'...')    
     scores = []
     CHUNK_SIZE = 100
-    files = _myutils.files_in_dir(pdb_dir, '*.pdb')
+    files = _myutils.files_in_dir(pdb_dir, '*.pdb') + _myutils.files_in_dir(pdb_dir, '*.ent')
     # run tmalign for each template in database
     for chunk in _myutils.group_it(files, CHUNK_SIZE):
         scores += [_run_tmalign(model_pdb_file, template) for template in chunk]
@@ -156,7 +170,7 @@ def main(argv=sys.argv):
     print('decoy selected: '+decoy_dict['description'])
     
     decoy_pdb_file = os.path.join(target_base_dir, 'models', decoy_dict['description'] + '.pdb')
-    struc_scores = _tmalign(decoy_pdb_file, pdb_dir)
+    struc_scores = _para_tmalign(decoy_pdb_file, pdb_dir)
 
     output_file_str = os.path.splitext(decoy_pdb_file)[0]+'_tmalign_scores.txt'
     _myutils.write_file(output_file_str , '\n'.join(' '.join(str(t)) for t in struc_scores))    
