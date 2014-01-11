@@ -65,14 +65,14 @@ def _run_para_tmalign(target_pdb,templates_pdbs):
     # parser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
     args = ["paratmalign %d %s %s %s"%(PROCESSES,target_pdb, TMALIGN_SEPARATOR ," ".join(templates_pdbs))]
     all = subprocess.check_output(args, shell=True).rstrip().decode("utf-8")
-		executions = all.split(TMALIGN_SEPARATOR)
-		name = os.path.basename(template_pdb)
-		scores = []
-		# gets the score of each execution
-		for e in executions:
-			score = subprocess.check_output("echo $s | $s"$(e,parser), shell=True).rstrip().decode("utf-8")
-			scores.append((name,float(score)))
-			
+    executions = all.split(TMALIGN_SEPARATOR)
+    name = os.path.basename(template_pdb)
+    scores = []
+    # gets the score of each execution
+    for e in executions:
+      score = subprocess.check_output("echo $s | $s"$(e,parser), shell=True).rstrip().decode("utf-8")
+      scores.append((name,float(score)))
+      
     return scores
 
 
