@@ -8,7 +8,10 @@ Created on Fri Dec 13 16:21:09 2013
 
 Dependencies:
 - TMalign needs to be in PATH
+- paratmalign needs to be in PATH
+- pdb2fasta needs to be in PATH
 - blastp needs to be in PATH
+- abinitio needs to be in PATH
 - grep needs to be in PATH
 - head needs to be in PATH
 
@@ -37,6 +40,7 @@ def _arguments():
     parser.add_argument("target_pdb_file", type=str, help="Target pdb file")
     parser.add_argument("pdb_dir", type=str, help="Path to structure database (directory with pdb files)")
     parser.add_argument("fasta_dir", type=str, help="Path to sequence database (directory with fasta files)")
+    parser.add_argument("rosetta_database", type=str, help="Path to the database which will be use by Rosetta's abinitio")
     return parser.parse_args()
 
 def _read_scorefile(target_base_dir):
@@ -65,9 +69,8 @@ def _run_para_tmalign(target_pdb,templates_pdbs):
     scoreParser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
     args = ["paratmalign %d '%s' '%s' %s"%(PROCESSES,target_pdb, TMALIGN_SEPARATOR ,"'"+"' '".join(templates_pdbs) + "'")]
 
-    # print("Args: "+" ".join(args))
-
-    all = subprocess.check_output(args, shell=True).rstrip().decode("utf-8")
+    devnull = open("/dev/null","w")
+    all = subprocess.check_output(args, shell=True,stderr=devnull).rstrip().decode("utf-8")
     # As there is an separator after every execution, the last element will be empty
     executions = all.split(TMALIGN_SEPARATOR)
 
@@ -77,12 +80,13 @@ def _run_para_tmalign(target_pdb,templates_pdbs):
         e = executions[i]
         name = os.path.basename(executions[i+1]).rstrip()
         try:
-            score = subprocess.check_output("echo $s | $s"%(e,scoreParser), shell=True).rstrip().decode("utf-8")
-            # print("%d Score: %s"%(i,score))
+            parsit = ["echo \"%s\" | %s"%(e,scoreParser)]
+            score = subprocess.check_output(parsit, shell=True).rstrip().decode("utf-8")
             scores.append((name,float(score)))
         except:
-            scores.append((name,0.0))
+            pass
       
+    devnull.close()
     return scores
 
 
@@ -135,6 +139,7 @@ def _tmalign(model_pdb_file, pdb_dir):
 BLAST_OUTP = ["10 bitscore score"]
 def _run_blast(target_fasta_file, model_fasta_file):
     args = ['blastp', '-query', target_fasta_file, '-subject', model_fasta_file, '-outfmt'] + BLAST_OUTP
+    print("Blast:{\n%s\n}"%(" ".join(args)))
     out = subprocess.check_output(args).strip().decode("utf-8")
     return float(out.split(',')[0]) if len(out) else 0
 
@@ -159,10 +164,27 @@ def main(argv=sys.argv):
     target_base_dir = os.path.join(*_myutils.split_path(target_pdb_path)[:-2])
     pdb_dir = os.path.abspath(args.pdb_dir)
     fasta_dir = os.path.abspath(args.fasta_dir)
+    rosetta_database = os.path.abspath(args.rosetta_database)
     
+        
     # step 1: run compbio_app
-    # TODO: currently done manually
     #compbio_app.linuxgccdebug @flags -database "$ROSETTA_DIR"/rosetta_database --nstruct 10 
+    cur_dir = os.getcwd()
+    os.chdir(target_base_dir)
+    abinitio = ["abinitio","@flags","-database",rosetta_database,"--nstruct 10"]
+    devnull = open("/dev/null","w")
+    print("Running abinitio:\n%s"%(" ".join(abinitio)))
+    subprocess.call(abinitio,stderr=devnull,stdout=devnull)
+    print("done with abinitio")
+    
+    # creates fasta files from generated pdbs
+    generated_models = _myutils.files_in_dir("models", '*.pdb')    
+    pdb2fasta = ["pdb2fasta"] + generated_models
+    print("Creating fasta files:\n%s"%(" ".join(pdb2fasta)))
+    subprocess.call(pdb2fasta,stderr=devnull,stdout=devnull)
+    print("done with fasta files")
+    os.chdir(cur_dir)
+    devnull.close()
     
     # step 2: read scorefile 
     field_dict_list = _read_scorefile(target_base_dir)

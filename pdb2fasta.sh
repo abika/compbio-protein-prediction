@@ -81,6 +81,9 @@ do
         echo $usage 1>&2
         exit 1
     fi
+		
+		destination=$(echo "$name" | sed s/\\..*/\\.fasta/)
+		echo $destination
 
     #sequence=$(cat $name | extract_seq_chain  $chain | remove_newline | convert_aa | remove_space)
     sequence=$(cat $name | extract_seq | remove_newline | convert_aa | remove_space)
@@ -89,8 +92,8 @@ do
         size=$(echo $sequence | wc -c)
         size=$((size-1))
         #echo ">${name%.pdb} | chain $chain | $size aa"
-        echo ">${name%.pdb}|PDBID|CHAIN|SEQUENCE"
+        echo ">${name%.pdb}|PDBID|CHAIN|SEQUENCE" > "$destination"
         #echo $sequence | split_80
-        echo $sequence
+        echo $sequence >> "$destination"
     fi
 done
