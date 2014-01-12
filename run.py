@@ -30,7 +30,7 @@ WEIGHT_SEQ = 0.01
 D = 1 # lower bound distance in angstrom for constraint extraction
 SD = '0.2' # scaling value for constraint distance
 TMALIGN_SEPARATOR = "# SEPARATOR #"
-PROCESSES = 8
+PROCESSES = 16
 
 def _arguments():
     parser = argparse.ArgumentParser()
@@ -63,21 +63,22 @@ def _read_scorefile(target_base_dir):
 
 def _run_para_tmalign(target_pdb,templates_pdbs):
     scoreParser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
-    nameParser = r"grep '^Name of Chain_2:'"
     args = ["paratmalign %d '%s' '%s' %s"%(PROCESSES,target_pdb, TMALIGN_SEPARATOR ,"'"+"' '".join(templates_pdbs) + "'")]
 
     # print("Args: "+" ".join(args))
 
     all = subprocess.check_output(args, shell=True).rstrip().decode("utf-8")
+    # As there is an separator after every execution, the last element will be empty
     executions = all.split(TMALIGN_SEPARATOR)
 
     scores = []
     # gets the score of each execution
-    for i in range(0,len(executions),2):
+    for i in range(0,len(executions)-1,2):
         e = executions[i]
-        name = executions[i+1]
+        name = os.path.basename(executions[i+1]).rstrip()
         try:
             score = subprocess.check_output("echo $s | $s"%(e,scoreParser), shell=True).rstrip().decode("utf-8")
+            # print("%d Score: %s"%(i,score))
             scores.append((name,float(score)))
         except:
             scores.append((name,0.0))
@@ -105,12 +106,13 @@ def _run_tmalign(target_pdb, template_pdb):
 def _para_tmalign(model_pdb_file, pdb_dir):
     print('running paraTMAlign for '+model_pdb_file+'...')    
     scores = []
-    CHUNK_SIZE = 100
+    CHUNK_SIZE = 200
     files = _myutils.files_in_dir(pdb_dir, '*.pdb') + _myutils.files_in_dir(pdb_dir, '*.ent')
     # run tmalign for each template in database
     for chunk in _myutils.group_it(files, CHUNK_SIZE):
         scores += _run_para_tmalign(model_pdb_file, chunk)
         print("%d/%d" % (len(scores), len(files)))
+        # print(scores)
     
     scores.sort(key=lambda t: t[1], reverse=True) # higher score better
     print("Scores.len = %d"%(len(scores)))
