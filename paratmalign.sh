@@ -14,7 +14,7 @@ f()
 	shift
 	for i in $@
 	do
-		TMalign $p $i
+		TMalign "$p" "$i"
 		echo "$separator"
 		echo "$i"
 		echo "$separator"
@@ -24,12 +24,8 @@ f()
 processes=$1
 protein=$2
 shift 3
-echo "Processes: \"$processes\""
-echo "Protein: \"$protein\""
-echo "Separator: \"$separator\""
 part=$(($# / processes))
-echo $#
-echo "part: \"$part\""
+
 # Distributes the input into equally-sized parts, each being executed sequentially
 for (( i=0; i < $processes - 1; i++))
 do
