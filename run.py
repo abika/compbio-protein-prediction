@@ -9,9 +9,8 @@ Created on Fri Dec 13 16:21:09 2013
 Dependencies:
 - TMalign needs to be in PATH
 - paratmalign needs to be in PATH
-- pdb2fasta needs to be in PATH
 - blastp needs to be in PATH
-- abinitio needs to be in PATH
+- abinitio needs to be in PATH (a link to the compbio_app.* executable)
 - grep needs to be in PATH
 - head needs to be in PATH
 
@@ -26,9 +25,9 @@ import itertools
 
 import _myutils
 
-DEVNULL = open(os.devnull,"w")
+DEVNULL = open(os.devnull, "w")
 
-NUM_STRUC_MODELS = 20 # number of used models per decoy
+NUM_STRUC_MODELS = 100 # number of used models per decoy
 NUM_CONSTR_MODELS = 3 # number of models used for constraint extraction per iteration
 WEIGHT_STRUC = 1
 WEIGHT_SEQ = 0.01
@@ -67,8 +66,8 @@ def _read_scorefile(target_base_dir):
         
     return field_dict_list
 
-def _run(args, shell=False, stdout=None, stderr=None):
-    return subprocess.check_output(args, shell=shell, stdout=stdout, stderr=stderr).rstrip().decode("utf-8")
+def _run(args, shell=False, stderr=None):
+    return subprocess.check_output(args, shell=shell, stderr=stderr).rstrip().decode("utf-8")
 
 def _run_para_tmalign(target_pdb,templates_pdbs):
     scoreParser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
@@ -90,7 +89,6 @@ def _run_para_tmalign(target_pdb,templates_pdbs):
             pass
     
     return scores
-
 
 def _run_tmalign(target_pdb, template_pdb):
     parser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
