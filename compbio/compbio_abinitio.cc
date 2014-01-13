@@ -150,8 +150,8 @@ compbio_abinitio::compbio_abinitio( int decoy_num )
     short_insert_region_ = false;
 
     // number of cycles
-    num_cycles_stage1_ = num_cycles_stage2_ = num_cycles_stage3_ = 110;
-    num_cycles_stage4_ = 50;
+    num_cycles_stage1_ = num_cycles_stage2_ = num_cycles_stage3_ = 2000;
+    num_cycles_stage4_ = 4000;
     num_cycles_stage5_ = 5000;
 
     // adding evaluator
