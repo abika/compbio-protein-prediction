@@ -14,10 +14,11 @@ f()
 	shift
 	for i in $@
 	do
-		TMalign "$p" "$i"
-		echo "$separator"
-		echo "$i"
-		echo "$separator"
+		a=$(TMalign "$p" "$i")
+		b=$(echo "$separator")
+		c=$(echo "$i")
+		d=$(echo "$separator")
+		echo "$a" "$b" "$c" "$d"
 	done
 }
 
