@@ -150,17 +150,9 @@ compbio_abinitio::compbio_abinitio( int decoy_num )
     short_insert_region_ = false;
 
     // number of cycles
-    // OLD:
-//     num_cycles_stage1_ = num_cycles_stage2_ = 200;
-//     num_cycles_stage3_ = 100;
-//     num_cycles_stage4_ = 50;
-//     num_cycles_stage5_ = 50;
-
-    // NEW:
-    num_cycles_stage1_ = num_cycles_stage2_ = 2000;
-    num_cycles_stage3_ = 2000;
-    num_cycles_stage4_ = 4000;
-    num_cycles_stage5_ = 50; // skipped!
+    num_cycles_stage1_ = num_cycles_stage2_ = num_cycles_stage3_ = 110;
+    num_cycles_stage4_ = 50;
+    num_cycles_stage5_ = 5000;
 
     // adding evaluator
     using namespace protocols::evaluation;
@@ -271,6 +263,13 @@ compbio_abinitio::setup()
     score_stage3b_ = ScoreFunctionFactory::create_score_function( "score5" );
     score_stage4_ = ScoreFunctionFactory::create_score_function( "score3" );
     score_stage5_ = ScoreFunctionFactory::create_score_function( "score3" );
+
+    core::scoring::constraints::add_constraints_from_cmdline_to_scorefxn(*score_stage1_);
+    core::scoring::constraints::add_constraints_from_cmdline_to_scorefxn(*score_stage2_);
+    core::scoring::constraints::add_constraints_from_cmdline_to_scorefxn(*score_stage3a_);
+    core::scoring::constraints::add_constraints_from_cmdline_to_scorefxn(*score_stage3b_);
+    core::scoring::constraints::add_constraints_from_cmdline_to_scorefxn(*score_stage4_);
+    core::scoring::constraints::add_constraints_from_cmdline_to_scorefxn(*score_stage5_);
 
     // Stages to recover pose
     tr.Info << "Setting update stage recovering vectors ...... " << std::endl;
@@ -410,7 +409,7 @@ compbio_abinitio::fold( core::pose::Pose & pose )
         if ( option [basic::options::OptionKeys::abinitio::debug]() )
         {
             output_debug_structure( pose, "stage2" );
-            tr << "Timeperstep: " << ( double (endtime) - starttime ) / ( CLOCKS_PER_SEC ) << std::endl;
+            // tr << "Timeperstep: " << ( double (endtime) - starttime ) / ( CLOCKS_PER_SEC ) << std::endl;
         }
     }
 
@@ -441,7 +440,7 @@ compbio_abinitio::fold( core::pose::Pose & pose )
         if ( option[ basic::options::OptionKeys::abinitio::debug]() )
         {
             output_debug_structure( pose, "stage3" );
-            tr << "Timeperstep: " << ( double(endtime) - starttime ) / ( CLOCKS_PER_SEC ) << std::endl;
+            // tr << "Timeperstep: " << ( double(endtime) - starttime ) / ( CLOCKS_PER_SEC ) << std::endl;
         }
     }
 
@@ -472,20 +471,20 @@ compbio_abinitio::fold( core::pose::Pose & pose )
         if ( option [basic::options::OptionKeys::abinitio::debug]() )
         {
             output_debug_structure( pose, "stage4" );
-            tr << "Timeperstep: " << ( double (endtime) - starttime ) / ( CLOCKS_PER_SEC ) << std::endl;
+            // tr << "Timeperstep: " << ( double (endtime) - starttime ) / ( CLOCKS_PER_SEC ) << std::endl;
         }
 
-        tr.Info << "\n=====================================================\n";
-        tr.Info << "   Finished Abinitio                                   \n";
-        tr.Info <<  std::endl;
+        //tr.Info << "\n=====================================================\n";
+        //tr.Info << "   Finished Abinitio                                   \n";
+        //tr.Info <<  std::endl;
     }
 
     if ( !skip_stage5_ )
     {
-        tr.Info << "\n=====================================================\n";
-        tr.Info << "   Stage 5                                             \n";
-        tr.Info << "   Folding with score3 for ";
-        tr.Info << num_cycles_stage5_ << std::endl;
+        //tr.Info << "\n=====================================================\n";
+        //tr.Info << "   Stage 5                                             \n";
+        //tr.Info << "   Folding with score3 for ";
+        //tr.Info << num_cycles_stage5_ << std::endl;
 
         clock_t starttime = clock();
 
@@ -507,7 +506,7 @@ compbio_abinitio::fold( core::pose::Pose & pose )
         if ( option [basic::options::OptionKeys::abinitio::debug]() )
         {
             output_debug_structure( pose, "stage5" );
-            tr << "Timeperstep: " << ( double (endtime) - starttime ) / ( CLOCKS_PER_SEC ) << std::endl;
+            // tr << "Timeperstep: " << ( double (endtime) - starttime ) / ( CLOCKS_PER_SEC ) << std::endl;
         }
     }
 
@@ -606,6 +605,8 @@ compbio_abinitio::replace_scorefxn( core::pose::Pose & pose, StageID stage )
     mc_->set_autotemp( true, temperature );
     mc_->set_temperature( temperature );          // temperature might have
     mc_->reset( pose );                           // changed due to autotemp..
+
+    core::scoring::constraints::add_constraints_from_cmdline_to_pose(pose);
 }
 
 /* --------------------------fold_stage1---------------------------- */

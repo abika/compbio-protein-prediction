@@ -1,5 +1,6 @@
 #include <core/types.hh>
 #include <core/init.hh>
+#include <core/scoring/constraints/util.hh>
 #include <utility/exit.hh>
 #include <utility/excn/EXCN_Base.hh>
 #include <utility/string_util.hh>
@@ -28,7 +29,7 @@ main( int argc, char * argv [] )
     struct stat st;
     if ( stat( "./models", &st ) == 0 )
     {
-        system( "rm -vr models" );
+        system( "rm -r models" );
     }
 
     if ( option[out::nstruct] && option[out::nstruct] > 0 )
@@ -46,9 +47,9 @@ main( int argc, char * argv [] )
         compbio_abinitio ab( 0 );
         ab.run();
     }
-    system( "mkdir -v models" );
-    system( "mv -v *.pdb models" );
-    system( "mv -v score.fsc models" );
+    system( "mkdir models" );
+    system( "mv *.pdb models" );
+    system( "mv score.fsc models" );
 
     return 0;
 }
