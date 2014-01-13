@@ -26,12 +26,6 @@ main( int argc, char * argv [] )
     compbio_abinitio::register_options();
     core::init( argc, argv );
 
-    struct stat st;
-    if ( stat( "./models", &st ) == 0 )
-    {
-        system( "rm -r models" );
-    }
-
     if ( option[out::nstruct] && option[out::nstruct] > 0 )
     {
         tr.Info << "nstruct option: " << option[out::nstruct] << std::endl;
@@ -47,9 +41,16 @@ main( int argc, char * argv [] )
         compbio_abinitio ab( 0 );
         ab.run();
     }
-    system( "mkdir models" );
-    system( "mv *.pdb models" );
-    system( "mv score.fsc models" );
+
+    struct stat st;
+    if ( stat( "./models", &st ) == 0 )
+    {
+      system( "rm -vr models" );
+    }
+
+    system( "mkdir -v models" );
+    system( "mv -v *.pdb models" );
+    system( "mv -v score.fsc models" );
 
     return 0;
 }
