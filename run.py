@@ -26,6 +26,8 @@ import itertools
 
 import _myutils
 
+DEVNULL = open(os.devnull,"w")
+
 NUM_STRUC_MODELS = 20 # number of used models per decoy
 NUM_CONSTR_MODELS = 3 # number of models used for constraint extraction per iteration
 WEIGHT_STRUC = 1
@@ -65,14 +67,15 @@ def _read_scorefile(target_base_dir):
         
     return field_dict_list
 
+def _run(args, shell=False, stdout=None, stderr=None):
+    return subprocess.check_output(args, shell=shell, stdout=stdout, stderr=stderr).rstrip().decode("utf-8")
+
 def _run_para_tmalign(target_pdb,templates_pdbs):
     scoreParser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
-    args = ["paratmalign %d '%s' '%s' %s"%(PROCESSES,target_pdb, TMALIGN_SEPARATOR ,"'"+"' '".join(templates_pdbs) + "'")]
-
-    devnull = open("/dev/null","w")
-    all = subprocess.check_output(args, shell=True,stderr=devnull).rstrip().decode("utf-8")
+    args = ["paratmalign.sh %d '%s' '%s' %s"%(PROCESSES,target_pdb, TMALIGN_SEPARATOR ,"'"+"' '".join(templates_pdbs) + "'")]
+    all_ = _run(args, shell=True, stderr=DEVNULL)
     # As there is an separator after every execution, the last element will be empty
-    executions = all.split(TMALIGN_SEPARATOR)
+    executions = all_.split(TMALIGN_SEPARATOR)
 
     scores = []
     # gets the score of each execution
@@ -80,27 +83,19 @@ def _run_para_tmalign(target_pdb,templates_pdbs):
         e = executions[i]
         name = os.path.basename(executions[i+1]).rstrip()
         try:
-            parsit = ["echo \"%s\" | %s"%(e,scoreParser)]
-            score = subprocess.check_output(parsit, shell=True).rstrip().decode("utf-8")
+            parsit = ["echo \"%s\" | %s"%(e,scoreParser)]            
+            score = _run(parsit, shell=True)
             scores.append((name,float(score)))
         except:
             pass
-      
-    devnull.close()
+    
     return scores
 
 
 def _run_tmalign(target_pdb, template_pdb):
-    # TODO: not sure if the correct score is extracted, '-a' maybe wrong too
-    # args = ["TMalign "+target_pdb+" "+template_pdb+" -a | grep ^TM-score "
-    #        """| tail -n 1 | sed -n 's|^.*TM-score= \([0-9.]\+\).*|\\1|p'"""]
-    # TMalign says:
-    # There are two TM-scores reported. You should use the one normalized by
-    # the length of the protein you are interested in.
-    # I think we should stick to that
     parser = r"grep ^TM-score | grep [0-9]*\\.[0-9]* -o | head -n 1"
     args = ["TMalign %s %s | "%(target_pdb, template_pdb) + parser]
-    score = subprocess.check_output(args, shell=True).rstrip().decode("utf-8")
+    score = _run(args, shell=True)
     try:
         return os.path.basename(template_pdb), float(score)
     except:
@@ -122,25 +117,12 @@ def _para_tmalign(model_pdb_file, pdb_dir):
     print("Scores.len = %d"%(len(scores)))
     return scores
 
-def _tmalign(model_pdb_file, pdb_dir):
-    print('running TMAlign for '+model_pdb_file+'...')    
-    scores = []
-    CHUNK_SIZE = 100
-    files = _myutils.files_in_dir(pdb_dir, '*.pdb') + _myutils.files_in_dir(pdb_dir, '*.ent')
-    # run tmalign for each template in database
-    for chunk in _myutils.group_it(files, CHUNK_SIZE):
-        scores += [_run_tmalign(model_pdb_file, template) for template in chunk]
-        print("%d/%d" % (len(scores), len(files)))
-    
-    scores.sort(key=lambda t: t[1], reverse=True) # higher score better
-    return scores
-
 #BLAST_OUTP = '10 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qseq sseq'
 BLAST_OUTP = ["10 bitscore score"]
 def _run_blast(target_fasta_file, model_fasta_file):
     args = ['blastp', '-query', target_fasta_file, '-subject', model_fasta_file, '-outfmt'] + BLAST_OUTP
     print("Blast:{\n%s\n}"%(" ".join(args)))
-    out = subprocess.check_output(args).strip().decode("utf-8")
+    out = _run(args)
     return float(out.split(',')[0]) if len(out) else 0
 
 def _residue_indices(res_list, bound_list):
@@ -153,7 +135,7 @@ def _run_tmalign_constr(target_pdb_file, template_pdb_file, d):
        d: minimum distance in angstrom.
     """
     args = ["TMalign "+target_pdb_file+" "+template_pdb_file+" -d "+str(d)+" | tail -n 4"]
-    outp_lines = subprocess.check_output(args, shell=True).rstrip().decode("utf-8").splitlines()
+    outp_lines = _run(args, shell=True).splitlines()
     return list(zip(_residue_indices(outp_lines[0], outp_lines[1]), _residue_indices(outp_lines[2], outp_lines[1])))
 
 def main(argv=sys.argv):
@@ -165,26 +147,15 @@ def main(argv=sys.argv):
     pdb_dir = os.path.abspath(args.pdb_dir)
     fasta_dir = os.path.abspath(args.fasta_dir)
     rosetta_database = os.path.abspath(args.rosetta_database)
-    
         
     # step 1: run compbio_app
-    #compbio_app.linuxgccdebug @flags -database "$ROSETTA_DIR"/rosetta_database --nstruct 10 
     cur_dir = os.getcwd()
     os.chdir(target_base_dir)
     abinitio = ["abinitio","@flags","-database",rosetta_database,"--nstruct 10"]
-    devnull = open("/dev/null","w")
     print("Running abinitio:\n%s"%(" ".join(abinitio)))
-    subprocess.call(abinitio,stderr=devnull,stdout=devnull)
-    print("done with abinitio")
-    
-    # creates fasta files from generated pdbs
-    generated_models = _myutils.files_in_dir("models", '*.pdb')    
-    pdb2fasta = ["pdb2fasta"] + generated_models
-    print("Creating fasta files:\n%s"%(" ".join(pdb2fasta)))
-    subprocess.call(pdb2fasta,stderr=devnull,stdout=devnull)
-    print("done with fasta files")
+    subprocess.call(abinitio, stdout=DEVNULL, stderr=DEVNULL)
     os.chdir(cur_dir)
-    devnull.close()
+    print("done with abinitio")
     
     # step 2: read scorefile 
     field_dict_list = _read_scorefile(target_base_dir)
@@ -226,17 +197,13 @@ def main(argv=sys.argv):
     res_pairs = _myutils.remove_dups(res_pairs, comp_item_index=1)
     
     # save constraint file
-    
-    # biopython not required, the residue numbering should be the same for tmalign and rosetta
-    #parser = Bio.PDB.PDBParser(PERMISSIVE=1)
-    #structure = parser.get_structure('id', target_pdb_file)
-
     # AtomPair: Atom1_Name Atom1_ResNum Atom2_Name Atom2_ResNum Func_Type Func_Def
     # AtomPair SG 5 V1 32 HARMONIC 0.0 0.2
     ros_constr = ['AtomPair CA '+str(n1)+' CA '+str(n2)+' HARMONIC 0.0 '+SD for n1, n2 in res_pairs]
     constr_file_path = os.path.join(target_base_dir,'inputs', 'ros_constraints.txt')
     _myutils.write_file(constr_file_path, '\n'.join(ros_constr) + '\n')
     
+    DEVNULL.close()
     print("DONE!")
 
 if __name__ == "__main__":
