@@ -11,6 +11,7 @@ Tested with python2!
 
 import os
 import shutil
+import re
 import glob
 import string
 import random
@@ -50,12 +51,20 @@ def move_file(src_str, dest_str):
 
 def write_file(file_path_str, str_, append=False, verbose=True):
     """Write string to file.
-       If 'append' is false an existing file will not be overwritten.
+       If 'append' is false an existing file will not be overwritten. Instead an index is added to the filename.
        If 'append' is true the string is appended to file if it already exists, the file is created otherwise.
     """
     if not append and os.path.exists(file_path_str):
-        logging.warning('file already exists (not overwriting): '+file_path_str)
-        return False
+        logging.warning('file already exists (renaming): '+file_path_str)
+        dir_, fname = os.path.split(file_path_str)
+        bname, ext = os.path.splitext(fname)
+        bname_pre = re.split('_[0-9]+$', bname)[0]
+        num_files = len(files_in_dir(dir_, bname_pre+'[_0-9]*'+ext))
+        while True:
+            file_path_str = os.path.join(dir_, bname_pre+'_'+str(num_files)+ext)
+            if not os.path.exists(file_path_str):
+                break
+            num_files += 1
     dir_name = os.path.dirname(file_path_str)
     if dir_name and not os.path.isdir(dir_name):
         logging.warning('directory does not exist (cant create file)): '+file_path_str)
