@@ -119,7 +119,7 @@ def _para_tmalign(model_pdb_file, pdb_dir):
 BLAST_OUTP = ["10 bitscore score"]
 def _run_blast(target_fasta_file, model_fasta_file):
     args = ['blastp', '-query', target_fasta_file, '-subject', model_fasta_file, '-outfmt'] + BLAST_OUTP
-    print("Blast:{\n%s\n}"%(" ".join(args)))
+    # print("Blast:{\n%s\n}"%(" ".join(args)))
     out = _run(args)
     return float(out.split(',')[0]) if len(out) else 0
 
@@ -200,6 +200,15 @@ def main(argv=sys.argv):
     ros_constr = ['AtomPair CA '+str(n1)+' CA '+str(n2)+' HARMONIC 0.0 '+SD for n1, n2 in res_pairs]
     constr_file_path = os.path.join(target_base_dir,'inputs', 'ros_constraints.txt')
     _myutils.write_file(constr_file_path, '\n'.join(ros_constr) + '\n')
+    
+    # step 6: runs abinitio with the constraints
+    
+    os.chdir(target_base_dir)
+    abinitio = ["abinitio","@flags","-database",rosetta_database,"-constraints:cst_file %s"%(constr_file_path),"--nstruct 10"]
+    print("Running abinitio:\n%s"%(" ".join(abinitio)))
+    subprocess.call(abinitio, stdout=DEVNULL, stderr=DEVNULL)
+    os.chdir(cur_dir)
+    print("done with abinitio")
     
     DEVNULL.close()
     print("DONE!")
