@@ -73,7 +73,7 @@ def write_file(file_path_str, str_, append=False, verbose=True):
     file_.write(str_)
     file_.close()
     if verbose:
-        logging.info("wrote "+str(len(str_))+" bytes to file : "+file_path_str)
+        logging.info("wrote "+str(len(str_))+" bytes to file: "+file_path_str)
     return file_path_str
 
 def read_file_lines(file_):

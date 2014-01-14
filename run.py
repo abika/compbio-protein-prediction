@@ -13,6 +13,7 @@ Dependencies:
 - abinitio needs to be in PATH (a link to the compbio_app.* executable)
 - grep needs to be in PATH
 - head needs to be in PATH
+- biopython needs to be in PYTHONPATH
 
 """
 
@@ -22,6 +23,8 @@ import argparse
 import os
 import subprocess
 import itertools
+
+import Bio.PDB
 
 import _myutils
 
@@ -35,12 +38,14 @@ NUM_CONSTR_MODELS = 1 # number of models used for constraint extraction per iter
 WEIGHT_STRUC = 1
 WEIGHT_SEQ = 0.01
 D = 1 # lower bound distance in angstrom for constraint extraction
+MIN_RES_SEQ_DIST = 10 # minimum distance between residues in model sequence to be considered "far away"
+MAX_RES_STRUC_DIST = 10 # maximum distance of residues in model structure to be considered bound to each other
 SD = '0.2' # scaling value for constraint distance
 PROCESSES = 16 # number of parallel TMAlign executions
 
 def _arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("target_pdb_file", type=str, help="Target pdb file")
+    parser.add_argument("target_fasta_file", type=str, help="Target fasta file")
     parser.add_argument("pdb_dir", type=str, help="Path to structure database (directory with pdb files)")
     parser.add_argument("fasta_dir", type=str, help="Path to sequence database (directory with fasta files)")
     parser.add_argument("rosetta_database", type=str, help="Path to the database which will be used by Rosetta's abinitio")
@@ -115,25 +120,46 @@ def _run_blast(target_fasta_file, model_fasta_file):
     return float(out.split(',')[0]) if len(out) else 0
 
 def _residue_indices(res_list, bound_list):
+    """Get a list of absolute residue numbers for a TMalign mapping"""
     it = itertools.count(1)
     return [a for a, x in zip((next(it) if a != '-' else None for a in res_list), bound_list) if x == ':']
     
-def _run_tmalign_constr(target_pdb_file, template_pdb_file, d):
-    """Run TMalign to get distance constraints between atom pairs.
-       A list of tuples is returned containing the indices for amino acid pairs.
+def _run_tmalign_constr(decoy_pdb_file, template_pdb_file, d):
+    """Run TMalign to get a sequence alignment mapping (based on structure) between decoy and template residues.
+       Return a dictionary with template residue numbers as keys and mapped target residue numbers as values.
        d: minimum distance in angstrom.
     """
-    args = ["TMalign "+target_pdb_file+" "+template_pdb_file+" -d "+str(d)+" | tail -n 4"]
+    args = ["TMalign "+decoy_pdb_file+" "+template_pdb_file+" -d "+str(d)+" | tail -n 4"]
     outp_lines = _run(args, shell=True).splitlines()
-    for l in outp_lines: print(l)
-    return list(zip(_residue_indices(outp_lines[0], outp_lines[1]), _residue_indices(outp_lines[2], outp_lines[1])))
+    target_res_list = _residue_indices(outp_lines[0], outp_lines[1])
+    template_res_list = _residue_indices(outp_lines[2], outp_lines[1])
+    return dict(zip(template_res_list, target_res_list))
+
+def _get_atom_distance(struc_res_list, res_num1, res_num2):
+    """Calculate distance of two residues in structure"""
+    atom1 = struc_res_list[res_num1-1]["CA"]
+    atom2 = struc_res_list[res_num2-1]["CA"]
+    return atom1 - atom2
+
+def _get_constraints(template_pdb_file, res_dict):
+    """Get target distance constraints between residue pairs (their CA atoms respectively).
+    """
+    template_res_list = sorted(res_dict.keys())
+    parser = Bio.PDB.PDBParser(PERMISSIVE=1, QUIET=True) # warnings are ignored
+    structure = parser.get_structure('id', template_pdb_file)
+    struc_res_list = list(structure.get_residues())
+    res_combs = ((n1, n2) for n1, n2 in itertools.combinations(template_res_list, 2) if abs(n1 - n2) >= MIN_RES_SEQ_DIST)
+    #print(list(res_combs))
+    template_dist_list = [(r1, r2, _get_atom_distance(struc_res_list, r1, r2)) for r1, r2 in res_combs] 
+    print('t1: ', template_dist_list)
+    return [(res_dict[r1], res_dict[r2]) for r1, r2, d in template_dist_list if d >= MAX_RES_STRUC_DIST]
 
 def main(argv=sys.argv):
     logging.getLogger().setLevel(logging.INFO)
     
     args = _arguments()
-    target_pdb_path = os.path.abspath(args.target_pdb_file)
-    target_base_dir = os.path.join(*_myutils.split_path(target_pdb_path)[:-2])
+    target_fasta_path = os.path.abspath(args.target_fasta_file)
+    target_base_dir = os.path.join(*_myutils.split_path(target_fasta_path)[:-2])
     pdb_dir = os.path.abspath(args.pdb_dir)
     fasta_dir = os.path.abspath(args.fasta_dir)
     rosetta_database = os.path.abspath(args.rosetta_database)
@@ -152,8 +178,7 @@ def main(argv=sys.argv):
     field_dict_list = _read_scorefile(target_base_dir)
 
     # step 3: find template scores for decoys  
-    scores = []        
-    target_fasta_file = os.path.splitext(target_pdb_path)[0]+'.fasta'
+    scores = []
     for decoy_dict in field_dict_list[:NUM_USED_DECOYS]:
         print('processed decoy: '+decoy_dict['description'])
         
@@ -166,7 +191,7 @@ def main(argv=sys.argv):
         # step 3.2: get sequence scores
         for model_pdb_file, struc_score in struc_scores:
             model_fasta_file = os.path.join(fasta_dir, model_pdb_file.rstrip('.pdb') + '.fasta')
-            seq_score = _run_blast(target_fasta_file, model_fasta_file)
+            seq_score = _run_blast(target_fasta_path, model_fasta_file)
             scores.append((decoy_dict['description'], model_pdb_file, struc_score, seq_score, WEIGHT_STRUC * struc_score + WEIGHT_SEQ * seq_score))
     
     scores.sort(key=lambda t: t[4], reverse=True)
@@ -179,9 +204,13 @@ def main(argv=sys.argv):
     # step 5: get constraints from selected models
     constr_models = scores[:NUM_CONSTR_MODELS]
     res_pairs = []
-    for decoy, model_file, strs, seqs, fs in constr_models:
+    for decoy_id, model_file, strs, seqs, fs in constr_models:
+        decoy_pdb_path = os.path.join(target_base_dir, 'models', decoy_id + '.pdb')
         model_pdb_path = os.path.join(pdb_dir, model_file)
-        res_pairs += _run_tmalign_constr(target_pdb_path, model_pdb_path, D)
+        # get residue alignment mapping
+        res_dict = _run_tmalign_constr(decoy_pdb_path, model_pdb_path, D)
+        # get final residue pairs for target structure
+        res_pairs += _get_constraints(model_pdb_path, res_dict)
     
     # remove inconsistent pairs
     res_pairs = _myutils.remove_dups(res_pairs, comp_item_index=0)
@@ -199,7 +228,7 @@ def main(argv=sys.argv):
     abinitio = ["abinitio", "@flags", "-database", rosetta_database, "-constraints:cst_file", constr_file_path,
                 "--nstruct", str(NUM_DECOYS), "-out:level", "200"]
     print("Running abinitio with constraints:\n%s"%(" ".join(abinitio)))
-    #subprocess.call(abinitio)
+    subprocess.call(abinitio)
     os.chdir(cur_dir)
     print("done with abinitio")
     
