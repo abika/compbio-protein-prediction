@@ -95,7 +95,7 @@ def _run_para_tmalign(target_pdb,templates_pdbs):
 def _para_tmalign(model_pdb_file, pdb_dir):
     print('running paraTMAlign for '+model_pdb_file+'...')    
     scores = []
-    CHUNK_SIZE = 200
+    CHUNK_SIZE = 100*PROCESSES
     files = _myutils.files_in_dir(pdb_dir, '*.pdb') + _myutils.files_in_dir(pdb_dir, '*.ent')
     # run tmalign for each template in database
     for chunk in _myutils.group_it(files, CHUNK_SIZE):
