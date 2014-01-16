@@ -202,14 +202,14 @@ def load_object(path_str):
         raise NameError("Error loading object '%s' doesn't define any object named '%s'" % (obj_str, mod_str))
     return obj
 
-def remove_dups(some_list, comp_item_index=-1):
+def remove_dups(some_list, comp_item_index=None):
     """Remove duplicated items in list, preserves order.
        If compItem is given some_list is treated as list of sequences, the duplicates
-       will be found by comparing the items at compItem position in the sequences.
+       will be found by comparing the items at comp_item_index position in the sequences.
     """
     seen = set()
     seen_add = seen.add
-    if comp_item_index > 0:
+    if comp_item_index is None:
         filt_list = [x for x in some_list if x not in seen and not seen_add(x)]
     else:
         filt_list = [t for t in some_list if t[comp_item_index] not in seen and not seen_add(t[comp_item_index])]

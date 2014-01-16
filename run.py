@@ -230,6 +230,7 @@ def main(argv=sys.argv):
     # AtomPair: Atom1_Name Atom1_ResNum Atom2_Name Atom2_ResNum Func_Type Func_Def
     # AtomPair SG 5 V1 32 HARMONIC 0.0 0.2
     ros_constr = ['AtomPair CA '+str(n1)+' CA '+str(n2)+' HARMONIC 0.0 '+SD for n1, n2 in res_pairs]
+    print('\n'.join(ros_constr))
     constr_file_path = os.path.join(target_base_dir,'inputs', 'ros_constraints.txt')
     constr_file_path = _myutils.write_file(constr_file_path, '\n'.join(ros_constr) + '\n')
     
