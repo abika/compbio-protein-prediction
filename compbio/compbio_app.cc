@@ -16,6 +16,8 @@
 #include <sys/stat.h>
 #include <apps/pilot/compbio/compbio_abinitio.hh>
 
+#include <string>
+
 static basic::Tracer tr( "apps.pilot.compbio" );
 
 int
@@ -42,15 +44,16 @@ main( int argc, char * argv [] )
         ab.run();
     }
 
-    struct stat st;
-    if ( stat( "./models", &st ) == 0 )
-    {
-      system( "rm -vr models" );
-    }
+//     struct stat st;
+//     if ( stat( "./models", &st ) == 0 )
+//     {
+//       system( "rm -vr models" );
+//     }
 
     system( "mkdir -v models" );
-    system( "mv -v *.pdb models" );
-    system( "mv -v score.fsc models" );
+    std::string mv = "mv -v ";
+    system( (mv + option[out::output_tag] + "model_*.pdb models").c_str() );
+    system( (mv + option[out::output_tag] + "score.fsc models").c_str() );
 
     return 0;
 }

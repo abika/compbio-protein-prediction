@@ -134,7 +134,7 @@ compbio_abinitio::compbio_abinitio( int decoy_num )
 
     // prepare tag
     std::stringstream oss;
-    oss << "model_"  << decoy_num;
+    oss << option[out::output_tag]() << "model_"  << decoy_num;
     tag_ = oss.str();
     tr.Info << "Tag:" << tag_ << std::endl;
 
@@ -282,7 +282,7 @@ compbio_abinitio::setup()
     recover_low_stages_.push_back( STAGE_5 );
 
     silent_score_file_ = new io::silent::SilentFileData;
-    silent_score_file_->set_filename( std::string( option[out::sf]()) );
+    silent_score_file_->set_filename( option[out::output_tag]() + std::string( option[out::sf]()) );
 }
 
 /*---------------------------------fold-------------------------------------
