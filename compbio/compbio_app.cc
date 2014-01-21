@@ -17,6 +17,7 @@
 #include <apps/pilot/compbio/compbio_abinitio.hh>
 
 #include <string>
+#include <basic/options/keys/constraints.OptionKeys.gen.hh>
 
 static basic::Tracer tr( "apps.pilot.compbio" );
 
@@ -27,6 +28,8 @@ main( int argc, char * argv [] )
     using namespace basic::options::OptionKeys;
     compbio_abinitio::register_options();
     core::init( argc, argv );
+
+    std::cout << "cst_weight: " << option[constraints::cst_weight] << std::endl;
 
     if ( option[out::nstruct] && option[out::nstruct] > 0 )
     {

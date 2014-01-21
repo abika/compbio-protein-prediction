@@ -254,6 +254,8 @@ compbio_abinitio::setup()
     input_pose_ = new pose::Pose;
     generate_extended_pose( *input_pose_, sequence_ );
 
+    core::scoring::constraints::add_constraints_from_cmdline_to_pose( *input_pose_ );
+
     // Setting up score functions
     tr.Info << "Setting up score functions ...... " << std::endl;
     using namespace scoring;
@@ -606,7 +608,7 @@ compbio_abinitio::replace_scorefxn( core::pose::Pose & pose, StageID stage )
     mc_->set_temperature( temperature );          // temperature might have
     mc_->reset( pose );                           // changed due to autotemp..
 
-    core::scoring::constraints::add_constraints_from_cmdline_to_pose(pose);
+    //core::scoring::constraints::add_constraints_from_cmdline_to_pose(pose);
 }
 
 /* --------------------------fold_stage1---------------------------- */

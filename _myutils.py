@@ -173,7 +173,7 @@ def add_to_archive(archive, file_str, file_is_path=True, name=None):
         arch_filename_str = name
     else:
         arch_filename_str = os.path.basename(file_str)    
-    # writing a file that does already exists does NOT OVERWRITE!
+    # writing a file that already exists does NOT OVERWRITE!
     # the file is archived two times and overwrites itself when extracting
     if arch_filename_str in archive.namelist():
         logging.warning('file already in archive (skipping): '+arch_filename_str)
@@ -225,8 +225,8 @@ def load_object(path_str):
 
 def remove_dups(some_list, comp_item_index=None):
     """Remove duplicated items in list, preserves order.
-       If compItem is given some_list is treated as list of sequences, the duplicates
-       will be found by comparing the items at comp_item_index position in the sequences.
+       If 'comp_item' is given 'some_list' is treated as list of sequences, the duplicates
+       will be found by comparing the items at 'comp_item_index' position in the sequences.
     """
     seen = set()
     seen_add = seen.add

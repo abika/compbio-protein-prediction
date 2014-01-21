@@ -45,7 +45,7 @@ WEIGHT_SEQ = 0.014 # TODO
 D = 1 # lower bound distance in angstrom for constraint extraction
 MIN_RES_SEQ_DIST = 10 # minimum distance between residues in template sequence to be considered "far away"
 MAX_RES_STRUC_DIST = 10 # maximum distance of residues in template structure to be considered bound to each other
-SD = '0.1' # scaling value for constraint distance, TODO
+SD = '0.2' # scaling value for constraint distance, TODO
 PROCESSES_ABINITIO = 3 # number of parallel abinitio executions
 PROCESSES_TMALIGN = 16 # number of parallel TMAlign executions
 
@@ -69,14 +69,16 @@ def _check_executables(args):
         sys.exit(1)
 
 def _run_rosetta(target_base_dir, rosetta_database, num_decoys, constr_file_path=None):
+    """Run the 'abinitio' executable in parallel"""
     cur_dir = os.getcwd()
     os.chdir(target_base_dir)
     _myutils.move('models', 'models', into_folder=False)
 
     abinitio = [ABINITIO_EXE, "@flags", "-database", rosetta_database, "-out:level", "200"]
     if constr_file_path:
-        abinitio += ["-constraints:cst_file", constr_file_path]
+        abinitio += ["-constraints:cst_file", constr_file_path, "-constraints:cst_weight", "1.0"]
 
+    # equally assign decoys to processes
     procs = min(PROCESSES_ABINITIO, num_decoys)
     avg = num_decoys / procs
     num_decoys_list = [round((i+1)*avg) - round(i*avg) for i in range(procs)]
