@@ -20,6 +20,7 @@ import zipfile
 import hashlib
 import datetime
 import importlib
+import subprocess
 
 def split_path(path):
     """Return a list of componenents of string 'path'"""
@@ -35,21 +36,44 @@ def split_path(path):
     folders.reverse()
     return folders
 
-def move_file(src_str, dest_str):
-    """Move an existing file from 'file_path_str' to 'dest_str'"""
+def _rename(file_path_str):
+    dir_name, fname = os.path.split(file_path_str)
+    bname, ext = os.path.splitext(fname)
+    bname_pre = re.split('_[0-9]+$', bname)[0]
+    num_files = len(files_in_dir(dir_name, bname_pre+'_[0-9]+'+ext))
+    while True:
+        file_path_str = os.path.join(dir_name, bname_pre+'_'+str(num_files)+ext)
+        if not os.path.exists(file_path_str):
+            break
+        num_files += 1
+    return file_path_str
+
+def move(src_str, dest_str, rename=True, into_folder=True):
+    """Move an existing file or directory from 'src_str' to 'dest_str'.
+       If 'rename' is true and the destination exists already the target will be renamed.
+       'into_folder' is used for that to determine if source should be moved into a destination directory or source
+       should be renamed instead.
+    """
     if not os.path.exists(src_str):
-        logging.warning('file does not exists (can not move): '+src_str)
-        return False       
-    if os.path.isdir(dest_str):
+        logging.warning('does not exist (can not move): '+src_str)
+        return False
+    if into_folder and os.path.isdir(dest_str):
+        if os.path.samefile(src_str, dest_str):
+            logging.warning('can not move directory into itself: '+src_str)
+            return False
         dest_str = os.path.join(dest_str, os.path.basename(src_str))
     if os.path.exists(dest_str):
-        logging.warning('file does already exist (not moving):'+dest_str)
-        return False 
+        if rename:
+            logging.info('does already exist (renaming): '+dest_str)
+            dest_str = _rename(dest_str)
+        else:
+            logging.warning('does already exist (not moving):'+dest_str)
+            return False
     logging.info('moving '+src_str+' to '+dest_str)
     shutil.move(src_str, dest_str)
     return True
 
-def write_file(file_path_str, str_, append=False, verbose=True):
+def write_file(file_path_str, str_, append=False, rename=True, verbose=True):
     """Write string to file.
        If 'append' is false an existing file will not be overwritten. Instead an index is added to the filename.
        If 'append' is true the string is appended to file if it already exists, the file is created otherwise.
@@ -57,17 +81,14 @@ def write_file(file_path_str, str_, append=False, verbose=True):
     """
     dir_name, fname = os.path.split(file_path_str)
     if not append and os.path.exists(file_path_str):
-        logging.warning('file already exists (renaming): '+file_path_str)
-        bname, ext = os.path.splitext(fname)
-        bname_pre = re.split('_[0-9]+$', bname)[0]
-        num_files = len(files_in_dir(dir_name, bname_pre+'[_0-9]*'+ext))
-        while True:
-            file_path_str = os.path.join(dir_name, bname_pre+'_'+str(num_files)+ext)
-            if not os.path.exists(file_path_str):
-                break
-            num_files += 1
+        if rename:
+            logging.info('file already exists (renaming): '+file_path_str)
+            file_path_str = _rename(file_path_str)
+        else:
+            logging.warning('file already exists (not overwriting): '+file_path_str)
+            return None
     if dir_name and not os.path.isdir(dir_name):
-        logging.warning('directory does not exist (cant create file)): '+file_path_str)
+        logging.warning('directory does not exist (can not create file)): '+file_path_str)
         return None
     file_ = open(file_path_str, 'a') if append else open(file_path_str, 'w')
     file_.write(str_)
@@ -152,7 +173,7 @@ def add_to_archive(archive, file_str, file_is_path=True, name=None):
         arch_filename_str = name
     else:
         arch_filename_str = os.path.basename(file_str)    
-    # writing a file that does already exists does NOT OVERWRITE!
+    # writing a file that already exists does NOT OVERWRITE!
     # the file is archived two times and overwrites itself when extracting
     if arch_filename_str in archive.namelist():
         logging.warning('file already in archive (skipping): '+arch_filename_str)
@@ -177,7 +198,7 @@ def datetime_from_zipinfo(z_info):
     return datetime.datetime(*(z_info.date_time)).strftime('%Y-%m-%d %H:%M:%S')
 
 def md5sum(str_):
-    """Calculate the md5sum in hex of an string"""
+    """Calculate the md5sum in hex of a string"""
     sanitized_str = ''.join([c for c in str_ if ord(c) < 128])             
     md5sum_str = hashlib.md5(sanitized_str).hexdigest()
     return md5sum_str
@@ -202,34 +223,37 @@ def load_object(path_str):
         raise NameError("Error loading object '%s' doesn't define any object named '%s'" % (obj_str, mod_str))
     return obj
 
-def remove_dups(some_list, comp_item_index=-1):
+def remove_dups(some_list, comp_item_index=None):
     """Remove duplicated items in list, preserves order.
-       If compItem is given some_list is treated as list of sequences, the duplicates
-       will be found by comparing the items at compItem position in the sequences.
+       If 'comp_item' is given 'some_list' is treated as list of sequences, the duplicates
+       will be found by comparing the items at 'comp_item_index' position in the sequences.
     """
     seen = set()
     seen_add = seen.add
-    if comp_item_index > 0:
+    if comp_item_index is None:
         filt_list = [x for x in some_list if x not in seen and not seen_add(x)]
     else:
         filt_list = [t for t in some_list if t[comp_item_index] not in seen and not seen_add(t[comp_item_index])]
     print('removed '+str(len(some_list)-len(filt_list))+' duplicates')
     return filt_list
 
+def is_executable(exe_name_str):
+    """Return true if executable 'exe_name_str' can be executed, else false."""
+    devnull = open(os.devnull, 'w')
+    try:
+        popen = subprocess.Popen(exe_name_str, stdout=devnull, stderr=devnull)
+    except OSError as e:
+        logging.warning('"'+exe_name_str+'" is not executable, OSError was: '+str(e))
+        return False
+    finally:
+        devnull.close()
+    popen.kill()
+    return True
+
+
 # ############
 # OLD STUFF...
 # ############
-
-def renameFile(src_str, dst_str):
-    if not os.path.exists(src_str):
-        print('source does not exist (not renaming): '+src_str)
-        return False
-    if os.path.exists(dst_str):
-        print('destination does already exist (not renaming): '+dst_str)
-        return False        
-    #print 'renaming '+src_str+' to '+dest_str
-    os.rename(src_str, dst_str)
-    return True
 
 def removeFile(file_str):
     if not os.path.exists(file_str):
@@ -248,7 +272,7 @@ def group(iterable, size):
 
 def chunkIt(seq, num):
     """Return a list containing the elements in seq divided into num evenly sized chunks."""
-    avg = len(seq)/float(num)
+    avg = len(seq) / float(num)
     out = []
     last = 0.0
     while last < len(seq):

@@ -134,7 +134,7 @@ compbio_abinitio::compbio_abinitio( int decoy_num )
 
     // prepare tag
     std::stringstream oss;
-    oss << "model_"  << decoy_num;
+    oss << option[out::output_tag]() << "model_"  << decoy_num;
     tag_ = oss.str();
     tr.Info << "Tag:" << tag_ << std::endl;
 
@@ -254,6 +254,8 @@ compbio_abinitio::setup()
     input_pose_ = new pose::Pose;
     generate_extended_pose( *input_pose_, sequence_ );
 
+    core::scoring::constraints::add_constraints_from_cmdline_to_pose( *input_pose_ );
+
     // Setting up score functions
     tr.Info << "Setting up score functions ...... " << std::endl;
     using namespace scoring;
@@ -282,7 +284,7 @@ compbio_abinitio::setup()
     recover_low_stages_.push_back( STAGE_5 );
 
     silent_score_file_ = new io::silent::SilentFileData;
-    silent_score_file_->set_filename( std::string( option[out::sf]()) );
+    silent_score_file_->set_filename( option[out::output_tag]() + std::string( option[out::sf]()) );
 }
 
 /*---------------------------------fold-------------------------------------
@@ -606,7 +608,7 @@ compbio_abinitio::replace_scorefxn( core::pose::Pose & pose, StageID stage )
     mc_->set_temperature( temperature );          // temperature might have
     mc_->reset( pose );                           // changed due to autotemp..
 
-    core::scoring::constraints::add_constraints_from_cmdline_to_pose(pose);
+    //core::scoring::constraints::add_constraints_from_cmdline_to_pose(pose);
 }
 
 /* --------------------------fold_stage1---------------------------- */

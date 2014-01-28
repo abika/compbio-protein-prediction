@@ -16,6 +16,9 @@
 #include <sys/stat.h>
 #include <apps/pilot/compbio/compbio_abinitio.hh>
 
+#include <string>
+#include <basic/options/keys/constraints.OptionKeys.gen.hh>
+
 static basic::Tracer tr( "apps.pilot.compbio" );
 
 int
@@ -25,6 +28,8 @@ main( int argc, char * argv [] )
     using namespace basic::options::OptionKeys;
     compbio_abinitio::register_options();
     core::init( argc, argv );
+
+    std::cout << "cst_weight: " << option[constraints::cst_weight] << std::endl;
 
     if ( option[out::nstruct] && option[out::nstruct] > 0 )
     {
@@ -42,15 +47,16 @@ main( int argc, char * argv [] )
         ab.run();
     }
 
-    struct stat st;
-    if ( stat( "./models", &st ) == 0 )
-    {
-      system( "rm -vr models" );
-    }
+//     struct stat st;
+//     if ( stat( "./models", &st ) == 0 )
+//     {
+//       system( "rm -vr models" );
+//     }
 
     system( "mkdir -v models" );
-    system( "mv -v *.pdb models" );
-    system( "mv -v score.fsc models" );
+    std::string mv = "mv -v ";
+    system( (mv + option[out::output_tag] + "model_*.pdb models").c_str() );
+    system( (mv + option[out::output_tag] + "score.fsc models").c_str() );
 
     return 0;
 }
