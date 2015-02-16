@@ -20,8 +20,9 @@ fi
 #=============================================================================
 # list chains in PDB
 list_chain() {
-    awk '/^ATOM/ && $3 == "CA" {print $5}' | uniq
-}
+    awk '/^ATOM/ && $3 == "CA" {print substr($5,1,1)}' | uniq # If the number of residue is greater than 999, 
+    # the chain number increase with the new residue number , for example: A1000,A1002,A1003, it would be a new chains.
+    }
 
 # extract residue sequence from ATOM lines
 # take residue from CA atom since
